@@ -51,13 +51,27 @@ function App() {
   const getType = (type) =>
     type?.charAt(0).toUpperCase() + type?.slice(1);
 
+  const getModelImage = (vehicle) => {
+    const model = `${vehicle.brand || ""} ${vehicle.model || ""} ${
+      vehicle.vehicle_name || ""
+    }`.toLowerCase();
+
+    if (model.includes("creta")) return "/images/cars/hyundai-creta.webp";
+    if (model.includes("swift")) return "/images/cars/maruti-swift.webp";
+    if (model.includes("nexon")) return "/images/cars/tata-nexon.webp";
+    if (model.includes("xuv700")) return "/images/cars/mahindra-xuv700.webp";
+
+    return null;
+  };
+
   const getFallbackImage = (vehicle) => {
     if (vehicle.vehicle_type === "car") return "/images/cars/rental-suv.jpg";
     if (vehicle.vehicle_type === "bike") return "/images/bikes/rental-motorcycle.jpg";
     return "/images/scooties/rental-scooter.jpg";
   };
 
-  const getImage = (vehicle) => vehicle.image || getFallbackImage(vehicle);
+  const getImage = (vehicle) =>
+    getModelImage(vehicle) || vehicle.image || getFallbackImage(vehicle);
     useEffect(() => {
     if (selectedVehicle && bookingFormRef.current) {
       bookingFormRef.current.scrollIntoView({
