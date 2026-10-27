@@ -14,10 +14,9 @@ Use `npm run build` to create a production build in `frontend/dist`.
 
 ## Deploy to Vercel with Neon PostgreSQL
 
-Vercel runs the Flask API and serves the built Vite app from the same project
-domain. The frontend uses relative `/api` URLs, so no cross-origin API URL or
-CORS setup is needed in production. Vercel's build script copies the Vite output
-into its `public/` static-assets directory.
+Vercel builds the Flask API and Vite frontend as two services under one project
+and one domain. `vercel.json` routes `/api/*` to Flask and all other paths to
+Vite. The frontend uses relative `/api` URLs, so no separate API URL is needed.
 
 ### Vercel environment variables
 
@@ -41,10 +40,11 @@ database. Do not run the MySQL `database/schema.sql` against Neon.
 ### Deploy and run Selenium
 
 1. Push the project to GitHub without committing `.env` files.
-2. In Vercel, choose **Add New → Project**, import the repository, and keep the
-   repository root as the Root Directory. Vercel reads `pyproject.toml` and
-   `requirements.txt`; its build script builds the frontend and the Flask app
-   handles API and SPA routes.
+2. In Vercel, choose **Add New → Project**, import the repository, keep the
+   repository root as the Root Directory, and choose **Services**. The two
+   configured service roots are `frontend/` (Vite) and `backend/` (Flask).
+   `vercel.json` routes `/api/*` to `backend` and the remaining paths to
+   `frontend`, including React routes such as `/login`.
 3. Add `DATABASE_URL` and `SECRET_KEY` as above, then deploy.
 4. Open `https://YOUR-PROJECT.vercel.app/api/health`. Wait for `"status":"healthy"`
    and `"schema":"ready"` before opening the website.
