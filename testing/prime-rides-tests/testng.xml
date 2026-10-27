@@ -1,0 +1,17 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Prime Rides UI Regression Suite" verbose="1" parallel="false">
+    <listeners>
+        <listener class-name="com.primerides.reporting.HtmlResultsReporter"/>
+    </listeners>
+    <test name="Homepage, navigation, and form validation">
+        <classes>
+            <class name="com.primerides.tests.NavigationTests"/>
+            <class name="com.primerides.tests.FormValidationTests"/>
+            <class name="com.primerides.tests.RegistrationBoundaryTests"/>
+            <class name="com.primerides.tests.LoginBoundaryTests"/>
+            <class name="com.primerides.tests.ApiContractTests"/>
+            <class name="com.primerides.tests.VisualAndResponsiveTests"/>
+            <class name="com.primerides.tests.VehicleCatalogTests"/>
+        </classes>
+    </test>
+</suite>
