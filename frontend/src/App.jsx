@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { API_URL } from "./config";
 
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+}
+
 function App() {
   const [location, setLocation] = useState("All locations");
   const [vehicleType, setVehicleType] = useState("All vehicles");
@@ -13,6 +21,10 @@ function App() {
   const [endDate, setEndDate] = useState("");
   const [bookingMessage, setBookingMessage] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(readStoredUser);
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState("");
   const bookingFormRef = useRef(null);
 
 
@@ -26,6 +38,31 @@ function App() {
       .catch(() => setError("Unable to load vehicles. Please check the backend."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function loadBookings(user = currentUser) {
+    if (!user?.id) {
+      setBookings([]);
+      return;
+    }
+    setBookingsLoading(true);
+    setBookingsError("");
+    try {
+      const response = await fetch(
+        `${API_URL}/api/bookings/?user_id=${encodeURIComponent(user.id)}`
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load booking history.");
+      setBookings(data.bookings || []);
+    } catch (loadError) {
+      setBookingsError(loadError.message || "Unable to load booking history.");
+    } finally {
+      setBookingsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadBookings(currentUser);
+  }, [currentUser?.id]);
 
   const filteredVehicles = vehicles.filter((vehicle) => {
     const matchesType =
@@ -85,7 +122,7 @@ function App() {
     event.preventDefault();
     setBookingMessage("");
 
-    const user = JSON.parse(localStorage.getItem("user") || "null");
+    const user = readStoredUser();
 
     if (!user) {
       window.location.href = "/login";
@@ -122,6 +159,7 @@ function App() {
       setBookingMessage(
         `Booking confirmed! Booking ID: ${data.booking_id}. Total: ${formatPrice(data.total_amount)}. Status: ${data.status}.`
       );
+      await loadBookings(user);
     } catch {
       setBookingMessage("Could not connect to the booking server.");
     } finally {
@@ -129,6 +167,33 @@ function App() {
     }
   }
 
+  const currentBookings = bookings.filter(
+    (booking) => new Date(booking.end_datetime).getTime() >= Date.now()
+  );
+  const previousBookings = bookings.filter(
+    (booking) => new Date(booking.end_datetime).getTime() < Date.now()
+  );
+
+  const renderBooking = (booking, isPast = false) => (
+    <article className="booking-history-card" key={booking.id}>
+      <div className="booking-history-card-top">
+        <div>
+          <span className="booking-id">BOOKING #{booking.id}</span>
+          <h3>{booking.vehicle_name}</h3>
+          <p>📍 {booking.city}, {booking.state}</p>
+        </div>
+        <span className={`booking-status ${isPast ? "is-past" : ""}`}>
+          {isPast ? "Completed" : (booking.status || "pending")}
+        </span>
+      </div>
+      <div className="booking-details-grid">
+        <div><span>Pickup</span><strong>{new Date(booking.start_datetime).toLocaleString()}</strong></div>
+        <div><span>Return</span><strong>{new Date(booking.end_datetime).toLocaleString()}</strong></div>
+        <div><span>Rental</span><strong>{getType(booking.booking_type)}</strong></div>
+        <div><span>Total</span><strong>{formatPrice(booking.total_amount)}</strong></div>
+      </div>
+    </article>
+  );
 
   return (
     <div className="site-wrapper">
@@ -145,19 +210,27 @@ function App() {
         </nav>
 
         <div className="nav-actions">
-          <button
-            className="login-button"
-            onClick={() => (window.location.href = "/login")}
-          >
-            Log in
-          </button>
-
-          <button
-            className="signup-button"
-            onClick={() => (window.location.href = "/register")}
-          >
-            Sign up
-          </button>
+          {currentUser ? (
+            <>
+              <a className="login-button" href="#booking-history">My bookings</a>
+              <span className="welcome-user">Hi, {currentUser.name}</span>
+              <button
+                className="signup-button"
+                onClick={() => {
+                  localStorage.removeItem("user");
+                  setCurrentUser(null);
+                  window.location.hash = "home";
+                }}
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="login-button" onClick={() => (window.location.href = "/login")}>Log in</button>
+              <button className="signup-button" onClick={() => (window.location.href = "/register")}>Sign up</button>
+            </>
+          )}
         </div>
       </header>
 
@@ -452,6 +525,46 @@ function App() {
               </button>
             </form>
           </div>
+        )}
+
+        {currentUser && (
+          <section className="booking-history-section" id="booking-history">
+            <div className="booking-history-heading">
+              <div>
+                <span className="section-label">YOUR RIDES</span>
+                <h2>My bookings</h2>
+                <p>See your upcoming rides and your previous bookings in one place.</p>
+              </div>
+              <button className="login-button" onClick={() => loadBookings()}>Refresh</button>
+            </div>
+
+            {bookingsLoading ? (
+              <p role="status">Loading your bookings…</p>
+            ) : bookingsError ? (
+              <p className="booking-history-error" role="alert">{bookingsError}</p>
+            ) : bookings.length === 0 ? (
+              <div className="booking-empty-state">
+                <strong>No bookings yet</strong>
+                <p>When you book a vehicle, it will appear here.</p>
+                <a className="primary-button" href="#vehicles">Explore vehicles <span>→</span></a>
+              </div>
+            ) : (
+              <div className="booking-history-groups">
+                <section aria-labelledby="current-bookings-heading">
+                  <h3 className="booking-group-heading" id="current-bookings-heading">Current & upcoming</h3>
+                  {currentBookings.length ? (
+                    <div className="booking-list">{currentBookings.map((booking) => renderBooking(booking))}</div>
+                  ) : <p className="booking-group-empty">No current or upcoming rides.</p>}
+                </section>
+                <section aria-labelledby="previous-bookings-heading">
+                  <h3 className="booking-group-heading" id="previous-bookings-heading">Previous bookings</h3>
+                  {previousBookings.length ? (
+                    <div className="booking-list">{previousBookings.map((booking) => renderBooking(booking, true))}</div>
+                  ) : <p className="booking-group-empty">Your completed rides will appear here.</p>}
+                </section>
+              </div>
+            )}
+          </section>
         )}
 
         <section className="why-section" id="why-us">

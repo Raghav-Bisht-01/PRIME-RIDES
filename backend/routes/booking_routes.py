@@ -9,6 +9,40 @@ from datetime import datetime, timezone
 booking_bp = Blueprint("bookings", __name__, url_prefix="/api/bookings")
 
 
+@booking_bp.route("/", methods=["GET"])
+def list_bookings():
+    """Return a user's bookings with the vehicle and pickup location details."""
+    raw_user_id = request.args.get("user_id")
+    try:
+        user_id = int(raw_user_id)
+        if user_id < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "A valid user_id is required"}), 400
+
+    try:
+        rows = db.session.execute(
+            text("""
+                SELECT b.id, b.vehicle_id, b.start_datetime, b.end_datetime,
+                       b.booking_type, b.total_amount, b.status, b.created_at,
+                       v.vehicle_name, v.vehicle_type,
+                       c.name AS city, s.name AS state
+                FROM bookings b
+                JOIN vehicles v ON v.id = b.vehicle_id
+                JOIN dealers d ON d.id = v.dealer_id
+                JOIN cities c ON c.id = d.city_id
+                JOIN states s ON s.id = c.state_id
+                WHERE b.user_id = :user_id
+                ORDER BY b.created_at DESC, b.id DESC
+            """),
+            {"user_id": user_id}
+        ).mappings().all()
+        return jsonify({"bookings": [dict(row) for row in rows]}), 200
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Unable to load booking history"}), 500
+
+
 @booking_bp.route("/", methods=["POST"])
 def create_booking():
     data = request.get_json(silent=True) or {}
