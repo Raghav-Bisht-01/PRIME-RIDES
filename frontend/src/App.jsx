@@ -50,6 +50,13 @@ function App() {
       const response = await fetch(
         `${API_URL}/api/bookings/?user_id=${encodeURIComponent(user.id)}`
       );
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        if (response.status === 404) {
+          throw new Error("Booking history API is missing from the running backend. Restart the backend server and refresh.");
+        }
+        throw new Error(`Booking server returned an unexpected response (HTTP ${response.status}). Restart the backend and try again.`);
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load booking history.");
       setBookings(data.bookings || []);
